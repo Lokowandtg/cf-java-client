@@ -66,6 +66,4 @@ abstract class _UserConfig {
     @JsonProperty("allowOriginLoop")
     @Nullable
     abstract Boolean getAllowOriginLoop();
-
-
 }
