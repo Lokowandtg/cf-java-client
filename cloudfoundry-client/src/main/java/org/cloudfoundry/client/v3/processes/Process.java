@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.cloudfoundry.Nullable;
 import org.cloudfoundry.client.v3.Metadata;
 import org.cloudfoundry.client.v3.Resource;
+import org.cloudfoundry.Nullable;
 
 /**
  * Base class for responses that are processes
@@ -43,6 +44,13 @@ public abstract class Process extends Resource {
      */
     @JsonProperty("health_check")
     public abstract HealthCheck getHealthCheck();
+
+    /**
+     * The readiness health check
+     */
+    @Nullable
+    @JsonProperty("readiness_health_check")
+    public abstract ReadinessHealthCheck getReadinessHealthCheck();
 
     /**
      * The instances
