@@ -155,7 +155,7 @@ abstract class _ReactorCloudFoundryClient implements CloudFoundryClient {
     @Override
     @Value.Derived
     public ApplicationUsageEvents applicationUsageEvents() {
-        return new ReactorApplicationUsageEvents(getConnectionContext(), getRootV2(), getTokenProvider(),
+        return new ReactorApplicationUsageEvents(getConnectionContext(), getRootV2(), getTokenProvider(), // TODO: Nach Prüfung mit V3 ersetzen. Könnte auch gehen?
                 getRequestTags());
     }
 

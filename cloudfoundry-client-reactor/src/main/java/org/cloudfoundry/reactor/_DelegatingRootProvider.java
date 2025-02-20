@@ -79,7 +79,7 @@ abstract class _DelegatingRootProvider extends AbstractRootProvider {
 	}
 
 	@Value.Derived
-	InfoV3PayloadRootProvider getInfoV3PayloadRootProvider() {
+	public InfoV3PayloadRootProvider getInfoV3PayloadRootProvider() {
 		return InfoV3PayloadRootProvider.builder().apiHost(getApiHost()).objectMapper(getObjectMapper()).port(getPort())
 				.secure(getSecure()).build();
 	}

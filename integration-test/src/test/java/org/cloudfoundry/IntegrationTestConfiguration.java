@@ -43,8 +43,8 @@ import org.cloudfoundry.client.CloudFoundryClient;
 import org.cloudfoundry.client.v2.organizationquotadefinitions.CreateOrganizationQuotaDefinitionRequest;
 import org.cloudfoundry.client.v2.organizations.AssociateOrganizationManagerRequest;
 import org.cloudfoundry.client.v2.organizations.CreateOrganizationRequest;
-import org.cloudfoundry.client.v2.spaces.CreateSpaceRequest;
-import org.cloudfoundry.client.v2.stacks.ListStacksRequest;
+//import org.cloudfoundry.client.v2.spaces.CreateSpaceRequest;
+//import org.cloudfoundry.client.v2.stacks.ListStacksRequest;
 import org.cloudfoundry.client.v2.userprovidedserviceinstances.CreateUserProvidedServiceInstanceRequest;
 import org.cloudfoundry.doppler.DopplerClient;
 import org.cloudfoundry.logcache.v1.TestLogCacheEndpoints;
@@ -52,7 +52,9 @@ import org.cloudfoundry.networking.NetworkingClient;
 import org.cloudfoundry.operations.DefaultCloudFoundryOperations;
 import org.cloudfoundry.reactor.ConnectionContext;
 import org.cloudfoundry.reactor.DefaultConnectionContext;
+import org.cloudfoundry.reactor.DelegatingRootProvider;
 import org.cloudfoundry.reactor.ProxyConfiguration;
+import org.cloudfoundry.reactor.RootProvider;
 import org.cloudfoundry.reactor.TokenProvider;
 import org.cloudfoundry.reactor.client.ReactorCloudFoundryClient;
 import org.cloudfoundry.reactor.doppler.ReactorDopplerClient;
@@ -78,6 +80,7 @@ import org.cloudfoundry.uaa.users.Email;
 import org.cloudfoundry.uaa.users.Name;
 import org.cloudfoundry.util.PaginationUtils;
 import org.cloudfoundry.util.ResourceUtils;
+import org.cloudfoundry.util.ResourceUtilsV3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -148,7 +151,7 @@ public class IntegrationTestConfiguration {
 
     @Bean
     @Qualifier("admin")
-    ReactorCloudFoundryClient adminCloudFoundryClient(
+    ReactorCloudFoundryClient adminCloudFoundryClient( // Scheint kein v2/v3 zu enthalten.
             ConnectionContext connectionContext,
             @Value("${test.admin.password}") String password,
             @Value("${test.admin.username}") String username) {
@@ -164,7 +167,7 @@ public class IntegrationTestConfiguration {
 
     @Bean
     @Qualifier("admin")
-    NetworkingClient adminNetworkingClient(
+    NetworkingClient adminNetworkingClient( // Scheint kein v2/v3 zu enthalten.
             ConnectionContext connectionContext,
             @Value("${test.admin.password}") String password,
             @Value("${test.admin.username}") String username) {
@@ -180,7 +183,7 @@ public class IntegrationTestConfiguration {
 
     @Bean
     @Qualifier("admin")
-    ReactorUaaClient adminUaaClient(
+    ReactorUaaClient adminUaaClient( // Scheint kein v2/v3 zu enthalten.
             ConnectionContext connectionContext,
             @Value("${test.admin.clientId}") String clientId,
             @Value("${test.admin.clientSecret}") String clientSecret) {
@@ -196,7 +199,7 @@ public class IntegrationTestConfiguration {
 
     @Bean(initMethod = "block")
     @DependsOn("cloudFoundryCleaner")
-    Mono<Tuple2<String, String>> client(
+    Mono<Tuple2<String, String>> client( // Scheint kein v2/v3 zu enthalten.
             @Qualifier("admin") UaaClient uaaClient,
             @Qualifier("clientId") String clientId,
             @Qualifier("clientSecret") String clientSecret) {
@@ -233,15 +236,16 @@ public class IntegrationTestConfiguration {
     }
 
     @Bean(initMethod = "clean", destroyMethod = "clean")
-    CloudFoundryCleaner cloudFoundryCleaner(
+    CloudFoundryCleaner cloudFoundryCleaner( // Scheint kein v2/v3 zu enthalten.
             @Qualifier("admin") CloudFoundryClient cloudFoundryClient,
             NameFactory nameFactory,
             @Qualifier("admin") NetworkingClient networkingClient,
             @Qualifier("serverVersion") Version serverVersion,
-            @Qualifier("admin") UaaClient uaaClient) {
+            @Qualifier("admin") UaaClient uaaClient,
+            ConnectionContext connectionContext) {
 
         return new CloudFoundryCleaner(
-                cloudFoundryClient, nameFactory, networkingClient, serverVersion, uaaClient);
+                cloudFoundryClient, nameFactory, networkingClient, serverVersion, uaaClient, connectionContext);
     }
 
     @Bean
@@ -280,7 +284,7 @@ public class IntegrationTestConfiguration {
     }
 
     @Bean
-    DefaultConnectionContext connectionContext(
+    DefaultConnectionContext connectionContext( // Scheint kein v2/v3 zu enthalten.
             @Value("${test.apiHost}") String apiHost,
             @Value("${test.proxy.host:}") String proxyHost,
             @Value("${test.proxy.password:}") String proxyPassword,
@@ -329,13 +333,13 @@ public class IntegrationTestConfiguration {
     }
 
     @Bean
-    RandomNameFactory nameFactory(Random random) {
+    RandomNameFactory nameFactory(Random random) { // Scheint kein v2/v3 zu enthalten.
         return new RandomNameFactory(random);
     }
 
     @Bean(initMethod = "block")
     @DependsOn("cloudFoundryCleaner")
-    Mono<String> metricRegistrarServiceInstance(
+    Mono<String> metricRegistrarServiceInstance( // TODO nur v2
             @Qualifier("nonAdmin") CloudFoundryClient cloudFoundryClient,
             @Qualifier("spaceId") Mono<String> spaceId,
             NameFactory nameFactory) {
@@ -365,7 +369,7 @@ public class IntegrationTestConfiguration {
 
     @Bean(initMethod = "block")
     @DependsOn("cloudFoundryCleaner")
-    Mono<String> organizationId(
+    Mono<String> organizationId( // TODO: Nur v2
             @Qualifier("nonAdmin") CloudFoundryClient cloudFoundryClient,
             @Qualifier("organizationName") String organizationName,
             @Qualifier("organizationQuotaName") String organizationQuotaName,
@@ -431,7 +435,7 @@ public class IntegrationTestConfiguration {
     }
 
     @Bean
-    String password(NameFactory nameFactory) {
+    String password(NameFactory nameFactory) { // Scheint kein v2/v3 zu enthalten.
         return nameFactory.getPassword();
     }
 
@@ -454,10 +458,13 @@ public class IntegrationTestConfiguration {
     }
 
     @Bean
-    Version serverVersion(ConnectionContext connectionContext) {
+    Version serverVersion(ConnectionContext connectionContext) { // Ist umgestellt.
+    	RootProvider tmp1 = connectionContext.getRootProvider();
+    	DelegatingRootProvider tmp2 = (DelegatingRootProvider)tmp1;
+    	String apiVersion = tmp2.getPreferedApiVersion(connectionContext);
         Queue<String> keyList =
                 new LinkedList<String>(
-                        Arrays.asList("links", "cloud_controller_v2", "meta", "version"));
+                        Arrays.asList("links", "cloud_controller_"+apiVersion, "meta", "version"));
 
         return connectionContext
                 .getRootProvider()
@@ -512,25 +519,49 @@ public class IntegrationTestConfiguration {
 
     @Bean(initMethod = "block")
     @DependsOn("cloudFoundryCleaner")
-    Mono<String> spaceId(
+    Mono<String> spaceId(ConnectionContext connectionContext,
             @Qualifier("nonAdmin") CloudFoundryClient cloudFoundryClient,
             @Qualifier("organizationId") Mono<String> organizationId,
             @Qualifier("spaceName") String spaceName) {
-        return organizationId
-                .flatMap(
-                        orgId ->
-                                cloudFoundryClient
-                                        .spaces()
-                                        .create(
-                                                CreateSpaceRequest.builder()
-                                                        .name(spaceName)
-                                                        .organizationId(orgId)
-                                                        .build()))
-                .map(ResourceUtils::getId)
-                .doOnSubscribe(s -> this.logger.debug(">> SPACE ({}) <<", spaceName))
-                .doOnError(Throwable::printStackTrace)
-                .doOnSuccess(id -> this.logger.debug("<< SPACE ({}) >>", id))
-                .cache();
+    	Mono<String> result;
+    	
+    	RootProvider tmp1 = connectionContext.getRootProvider();
+    	DelegatingRootProvider tmp2 = (DelegatingRootProvider)tmp1;
+    	String apiVersion = tmp2.getPreferedApiVersion(connectionContext);
+    	if ("v3".equals(apiVersion)) {
+    		result = organizationId  // das ist ein v2?!
+                    .flatMap(
+                            orgId -> {
+                            	return cloudFoundryClient
+                                            .spacesV3()
+                                            .create(
+                                            		org.cloudfoundry.client.v3.spaces.CreateSpaceRequest.builder()
+                                                            .name(spaceName)
+                                                //            .organizationId(orgId)
+                                                            .build());})
+                    .map(ResourceUtilsV3::getId)
+                    .doOnSubscribe(s -> this.logger.debug(">> SPACE ({}) <<", spaceName))
+                    .doOnError(Throwable::printStackTrace)
+                    .doOnSuccess(id -> this.logger.debug("<< SPACE ({}) >>", id))
+                    .cache();
+    	}else {
+    		result = organizationId
+                    .flatMap(
+                            orgId ->
+                                    cloudFoundryClient
+                                            .spaces()
+                                            .create(
+                                            		org.cloudfoundry.client.v2.spaces.CreateSpaceRequest.builder()
+                                                            .name(spaceName)
+                                                            .organizationId(orgId)
+                                                            .build()))
+                    .map(ResourceUtils::getId)
+                    .doOnSubscribe(s -> this.logger.debug(">> SPACE ({}) <<", spaceName))
+                    .doOnError(Throwable::printStackTrace)
+                    .doOnSuccess(id -> this.logger.debug("<< SPACE ({}) >>", id))
+                    .cache();
+    	}
+        return result;
     }
 
     @Bean
@@ -540,24 +571,51 @@ public class IntegrationTestConfiguration {
 
     @Bean(initMethod = "block")
     @DependsOn("cloudFoundryCleaner")
-    Mono<String> stackId(
+    Mono<String> stackId(ConnectionContext connectionContext,
             @Qualifier("nonAdmin") CloudFoundryClient cloudFoundryClient,
             @Qualifier("stackName") String stackName) {
-        return PaginationUtils.requestClientV2Resources(
-                        page ->
-                                cloudFoundryClient
-                                        .stacks()
-                                        .list(
-                                                ListStacksRequest.builder()
-                                                        .name(stackName)
-                                                        .page(page)
-                                                        .build()))
-                .single()
-                .map(ResourceUtils::getId)
-                .doOnSubscribe(s -> this.logger.debug(">> STACK ({}) <<", stackName))
-                .doOnError(Throwable::printStackTrace)
-                .doOnSuccess(id -> this.logger.debug("<< STACK ({})>>", id))
-                .cache();
+    	Mono<String> result;
+    	
+    	RootProvider tmp1 = connectionContext.getRootProvider();
+    	DelegatingRootProvider tmp2 = (DelegatingRootProvider)tmp1;
+    	String apiVersion = tmp2.getPreferedApiVersion(connectionContext);
+    	if ("v3".equals(apiVersion)) {
+    		result = PaginationUtils.requestClientV3Resources(
+                    page -> {
+                    return cloudFoundryClient
+                            .stacksV3()
+                            .list(org.cloudfoundry.client.v3.stacks.ListStacksRequest.builder()
+                                           	.name(stackName)
+                                           	.page(page)
+                                           	.build());
+                    }
+                            )
+    				.single()
+    				.map(ResourceUtilsV3::getId)
+    				.doOnSubscribe(s -> this.logger.debug(">> STACK ({}) <<", stackName))
+    				.doOnError(Throwable::printStackTrace)
+    				.doOnSuccess(id -> this.logger.debug("<< STACK ({})>>", id))
+    				.cache();
+    		
+    	}else {
+    		result = PaginationUtils.requestClientV2Resources(
+                    page -> {
+                    return cloudFoundryClient
+                            .stacks()
+                            .list(org.cloudfoundry.client.v2.stacks.ListStacksRequest.builder()
+                                           	.name(stackName)
+                                           	.page(page)
+                                           	.build());
+                    }
+                            )
+    				.single()
+    				.map(ResourceUtils::getId)
+    				.doOnSubscribe(s -> this.logger.debug(">> STACK ({}) <<", stackName))
+    				.doOnError(Throwable::printStackTrace)
+    				.doOnSuccess(id -> this.logger.debug("<< STACK ({})>>", id))
+    				.cache();
+    	}
+        return result;
     }
 
     @Bean
@@ -575,7 +633,7 @@ public class IntegrationTestConfiguration {
             @Qualifier("testLogCacheAppName") String testLogCacheAppName,
             @Qualifier("testLogCacheHostName") String testLogCacheHostName,
             Path testLogCacheAppbits) {
-        return metricRegistrarServiceInstance
+        return metricRegistrarServiceInstance // Nur v2?
                 .zipWith(spaceId)
                 .flatMap(
                         function(
@@ -720,7 +778,7 @@ public class IntegrationTestConfiguration {
     }
 
     @Bean
-    String username(NameFactory nameFactory) {
+    String username(NameFactory nameFactory) { // Scheint kein v2/v3 zu enthalten.
         return nameFactory.getUserName();
     }
 

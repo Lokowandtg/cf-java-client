@@ -17,6 +17,10 @@
 package org.cloudfoundry.reactor;
 
 import io.netty.handler.codec.http.HttpHeaders;
+
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.regex.Matcher;
@@ -148,4 +152,21 @@ abstract class AbstractRootProvider implements RootProvider {
     private Mono<Void> trust(String host, int port, ConnectionContext connectionContext) {
         return connectionContext.trust(host, port);
     }
+    
+    /**
+     * either "v2" or "v3". If v3 is available, this is returned. TODO: Add override mechanism.
+     */
+    public String getPreferedApiVersion(ConnectionContext connectionContext) {
+   		System.err.println("checking api version to use");
+   	 Queue<String> keyList = new LinkedList<String>(Arrays.asList("links", "cloud_controller_v3","meta","version"));
+   	Mono<String> cached = doGetRootKey(keyList, connectionContext);
+   	String hasV3 = cached.block(Duration.ofSeconds(100000));// TODO: 10 ist genug
+   	if (hasV3!=null && !hasV3.isEmpty()) {
+   		System.err.println("using api version v3");
+   		return "v3"; // TODO: Implement, should be overriden by env and should return v3 only if that is available.
+   	}else {
+   		System.err.println("using api version v2");
+   		return "v2"; // if v3 is not available, fail back to v2. 
+   	}
+   }
 }

@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-package org.cloudfoundry;
+package org.cloudfoundry.client.v3;
+
+import org.cloudfoundry.Cleaner;
 
 //import static org.cloudfoundry.CloudFoundryVersion.PCF_1_12;
 //import static org.cloudfoundry.CloudFoundryVersion.PCF_2_1;
@@ -23,20 +25,16 @@ package org.cloudfoundry;
 
 import com.github.zafarkhaja.semver.Version;
 import java.time.Duration;
-import java.util.function.Supplier;
-
 //import java.util.HashMap;
 //import java.util.Map;
 //import java.util.function.Supplier;
-import javax.net.ssl.SSLException;
+//import javax.net.ssl.SSLException;
 
+import org.cloudfoundry.NameFactory;
 import org.cloudfoundry.client.CloudFoundryClient;
-import org.cloudfoundry.client.v2.CloudFoundryCleanerV2;
+//import org.cloudfoundry.client.v2.CloudFoundryCleanerV2;
 //import org.cloudfoundry.client.v2.applications.ListApplicationServiceBindingsRequest;
 //import org.cloudfoundry.client.v2.applications.RemoveApplicationServiceBindingRequest;
-import org.cloudfoundry.client.v3.CloudFoundryCleanerV3;
-import org.cloudfoundry.client.v3.info.GetInfoRequestV3;
-import org.cloudfoundry.client.v3.info.GetInfoResponseV3;
 //import org.cloudfoundry.client.v2.buildpacks.DeleteBuildpackRequest;
 //import org.cloudfoundry.client.v2.buildpacks.ListBuildpacksRequest;
 //import org.cloudfoundry.client.v2.featureflags.ListFeatureFlagsRequest;
@@ -83,9 +81,16 @@ import org.cloudfoundry.client.v3.info.GetInfoResponseV3;
 //import org.cloudfoundry.client.v2.users.UserResource;
 //import org.cloudfoundry.client.v3.Metadata;
 //import org.cloudfoundry.client.v3.Relationship;
-//import org.cloudfoundry.client.v3.applications.Application;
-//import org.cloudfoundry.client.v3.applications.DeleteApplicationRequest;
-//import org.cloudfoundry.client.v3.applications.ListApplicationsRequest;
+import org.cloudfoundry.client.v3.applications.Application;
+import org.cloudfoundry.client.v3.applications.DeleteApplicationRequest;
+import org.cloudfoundry.client.v3.applications.ListApplicationsRequest;
+import org.cloudfoundry.client.v3.servicebindings.DeleteServiceBindingRequest;
+import org.cloudfoundry.client.v3.servicebindings.ListServiceBindingsRequest;
+import org.cloudfoundry.client.v3.serviceinstances.DeleteServiceInstanceRequest;
+import org.cloudfoundry.client.v3.serviceinstances.GetServiceInstanceRequest;
+import org.cloudfoundry.client.v3.serviceinstances.ListServiceInstancesRequest;
+import org.cloudfoundry.client.v3.serviceinstances.ServiceInstanceResource;
+import org.cloudfoundry.util.LastOperationUtilsV3;
 //import org.cloudfoundry.client.v3.serviceinstances.ListSharedSpacesRelationshipRequest;
 //import org.cloudfoundry.client.v3.serviceinstances.ListSharedSpacesRelationshipResponse;
 //import org.cloudfoundry.client.v3.serviceinstances.UnshareServiceInstanceRequest;
@@ -93,10 +98,7 @@ import org.cloudfoundry.client.v3.info.GetInfoResponseV3;
 //import org.cloudfoundry.client.v3.spaces.GetSpaceResponse;
 //import org.cloudfoundry.client.v3.spaces.UpdateSpaceRequest;
 //import org.cloudfoundry.client.v3.spaces.UpdateSpaceResponse;
-import org.cloudfoundry.networking.NetworkingClient;
-import org.cloudfoundry.reactor.ConnectionContext;
-import org.cloudfoundry.reactor.DelegatingRootProvider;
-import org.cloudfoundry.reactor.RootProvider;
+//import org.cloudfoundry.networking.NetworkingClient;
 //import org.cloudfoundry.networking.v1.policies.DeletePoliciesRequest;
 //import org.cloudfoundry.networking.v1.policies.Destination;
 //import org.cloudfoundry.networking.v1.policies.ListPoliciesRequest;
@@ -104,7 +106,7 @@ import org.cloudfoundry.reactor.RootProvider;
 //import org.cloudfoundry.networking.v1.policies.Policy;
 //import org.cloudfoundry.networking.v1.policies.Ports;
 //import org.cloudfoundry.networking.v1.policies.Source;
-import org.cloudfoundry.uaa.UaaClient;
+//import org.cloudfoundry.uaa.UaaClient;
 //import org.cloudfoundry.uaa.clients.DeleteClientRequest;
 //import org.cloudfoundry.uaa.clients.ListClientsRequest;
 //import org.cloudfoundry.uaa.groups.DeleteGroupRequest;
@@ -122,17 +124,16 @@ import org.cloudfoundry.uaa.UaaClient;
 //import org.cloudfoundry.util.FluentMap;
 //import org.cloudfoundry.util.JobUtils;
 //import org.cloudfoundry.util.LastOperationUtils;
-//import org.cloudfoundry.util.PaginationUtils;
-//import org.cloudfoundry.util.ResourceUtils;
+import org.cloudfoundry.util.PaginationUtils;
+import org.cloudfoundry.util.ResourceUtilsV3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
 //import reactor.util.function.Tuples;
-import reactor.util.retry.Retry;
+//import reactor.util.retry.Retry;
 
-final class CloudFoundryCleaner {
+final public class CloudFoundryCleanerV3 implements Cleaner{
 
     private static final Logger LOGGER = LoggerFactory.getLogger("cloudfoundry-client.test");
 
@@ -150,119 +151,112 @@ final class CloudFoundryCleaner {
 //                    .entry("user_org_creation", false)
 //                    .build();
 
-    private final CloudFoundryClient cloudFoundryClient;
+//    private final CloudFoundryClient cloudFoundryClient;
+//
+//    private final NameFactory nameFactory;
+//
+//    private final NetworkingClient networkingClient;
+//
+//    private final Version serverVersion;
+//
+//    private final UaaClient uaaClient;
 
-    private final NameFactory nameFactory;
-
-    private final NetworkingClient networkingClient;
-
-    private final Version serverVersion;
-
-    private final UaaClient uaaClient;
-    
-    private final ConnectionContext connectionContext;
-
-    private Cleaner cleaner;
-    
-    CloudFoundryCleaner(
-            CloudFoundryClient cloudFoundryClient,
-            NameFactory nameFactory,
-            NetworkingClient networkingClient,
-            Version serverVersion,
-            UaaClient uaaClient,
-            ConnectionContext connectionContext) {
-        this.cloudFoundryClient = cloudFoundryClient;
-        this.nameFactory = nameFactory;
-        this.networkingClient = networkingClient;
-        this.serverVersion = serverVersion;
-        this.uaaClient = uaaClient;
-        this.connectionContext = connectionContext;
-        cleaner = getCleaner();
-    }
-
-    void clean() {
-        Flux.empty()
-                .thenMany(
-                        Mono.when( // Before Routes
-                        		cleaner.cleanServiceInstances(
-                                        this.cloudFoundryClient,
-                                        this.nameFactory,
-                                        this.serverVersion),
-                        		CloudFoundryCleanerV2.cleanUserProvidedServiceInstances(
-                                        this.cloudFoundryClient, this.nameFactory)))
-                .thenMany(
-                        Mono.when( // No prerequisites
-                        		CloudFoundryCleanerV2.cleanBuildpacks(this.cloudFoundryClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanClients(this.uaaClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanFeatureFlags(this.cloudFoundryClient),
-                        		CloudFoundryCleanerV2.cleanGroups(this.uaaClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanIdentityProviders(this.uaaClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanIdentityZones(this.uaaClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanNetworkingPolicies(
-                                        this.networkingClient,
-                                        this.nameFactory,
-                                        this.serverVersion),
-                        		CloudFoundryCleanerV2.cleanRoutes(this.cloudFoundryClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanSecurityGroups(this.cloudFoundryClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanServiceBrokers(this.cloudFoundryClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanSpaceQuotaDefinitions(
-                                        this.cloudFoundryClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanStacks(this.cloudFoundryClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanUsers(this.cloudFoundryClient, this.nameFactory)))
-                .thenMany(
-                        Mono.when(
-                        		CloudFoundryCleanerV3.cleanApplicationsV3(
-                                        this.cloudFoundryClient,
-                                        this.nameFactory), // After Routes, cannot run with
-                                // other cleanApps
-                                CloudFoundryCleanerV2.cleanUsers(this.uaaClient, this.nameFactory) // After CF Users
-                                ))
-                .thenMany(
-                        Mono.when( // After Routes/Applications
-                        		CloudFoundryCleanerV2.cleanPrivateDomains(this.cloudFoundryClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanSharedDomains(this.cloudFoundryClient, this.nameFactory),
-                        		CloudFoundryCleanerV2.cleanSpaces(this.cloudFoundryClient, this.nameFactory)))
-                .thenMany(
-                		CloudFoundryCleanerV2.cleanOrganizations(
-                                this.cloudFoundryClient, this.nameFactory)) // After Spaces
-                .thenMany(
-                		CloudFoundryCleanerV2.cleanOrganizationQuotaDefinitions(
-                                this.cloudFoundryClient, this.nameFactory)) // After Organizations
-                .retryWhen(Retry.max(5).filter(SSLException.class::isInstance))
-                .doOnSubscribe(s -> LOGGER.debug(">> CLEANUP <<"))
-                .doOnComplete(() -> LOGGER.debug("<< CLEANUP >>"))
-                .then()
-                .block(Duration.ofMinutes(30));
-    }
-
-//    private static Flux<Void> cleanApplicationsV3(
-//            CloudFoundryClient cloudFoundryClient, NameFactory nameFactory) {
-//        return PaginationUtils.requestClientV3Resources(
-//                        page ->
-//                                cloudFoundryClient
-//                                        .applicationsV3()
-//                                        .list(ListApplicationsRequest.builder().page(page).build()))
-//                .filter(application -> nameFactory.isApplicationName(application.getName()))
-//                .delayUntil(
-//                        application ->
-//                                removeApplicationServiceBindings(cloudFoundryClient, application))
-//                .flatMap(
-//                        application ->
-//                                cloudFoundryClient
-//                                        .applicationsV3()
-//                                        .delete(
-//                                                DeleteApplicationRequest.builder()
-//                                                        .applicationId(application.getId())
-//                                                        .build())
-//                                        .then()
-//                                        .doOnError(
-//                                                t ->
-//                                                        LOGGER.error(
-//                                                                "Unable to delete V3 application"
-//                                                                        + " {}",
-//                                                                application.getName(),
-//                                                                t)));
+//    CloudFoundryCleanerV3(
+//            CloudFoundryClient cloudFoundryClient,
+//            NameFactory nameFactory,
+//            NetworkingClient networkingClient,
+//            Version serverVersion,
+//            UaaClient uaaClient) {
+//        this.cloudFoundryClient = cloudFoundryClient;
+//        this.nameFactory = nameFactory;
+//        this.networkingClient = networkingClient;
+//        this.serverVersion = serverVersion;
+//        this.uaaClient = uaaClient;
 //    }
+
+//    void clean() {
+//        Flux.empty()
+//                .thenMany(
+//                        Mono.when( // Before Routes
+//                        		CloudFoundryCleanerV2.cleanServiceInstances(
+//                                        this.cloudFoundryClient,
+//                                        this.nameFactory,
+//                                        this.serverVersion),
+//                        		CloudFoundryCleanerV2.cleanUserProvidedServiceInstances(
+//                                        this.cloudFoundryClient, this.nameFactory)))
+//                .thenMany(
+//                        Mono.when( // No prerequisites
+//                        		CloudFoundryCleanerV2.cleanBuildpacks(this.cloudFoundryClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanClients(this.uaaClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanFeatureFlags(this.cloudFoundryClient),
+//                        		CloudFoundryCleanerV2.cleanGroups(this.uaaClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanIdentityProviders(this.uaaClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanIdentityZones(this.uaaClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanNetworkingPolicies(
+//                                        this.networkingClient,
+//                                        this.nameFactory,
+//                                        this.serverVersion),
+//                        		CloudFoundryCleanerV2.cleanRoutes(this.cloudFoundryClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanSecurityGroups(this.cloudFoundryClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanServiceBrokers(this.cloudFoundryClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanSpaceQuotaDefinitions(
+//                                        this.cloudFoundryClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanStacks(this.cloudFoundryClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanUsers(this.cloudFoundryClient, this.nameFactory)))
+//                .thenMany(
+//                        Mono.when(
+//                                cleanApplicationsV3(
+//                                        this.cloudFoundryClient,
+//                                        this.nameFactory), // After Routes, cannot run with
+//                                // other cleanApps
+//                                CloudFoundryCleanerV2.cleanUsers(this.uaaClient, this.nameFactory) // After CF Users
+//                                ))
+//                .thenMany(
+//                        Mono.when( // After Routes/Applications
+//                        		CloudFoundryCleanerV2.cleanPrivateDomains(this.cloudFoundryClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanSharedDomains(this.cloudFoundryClient, this.nameFactory),
+//                        		CloudFoundryCleanerV2.cleanSpaces(this.cloudFoundryClient, this.nameFactory)))
+//                .thenMany(
+//                		CloudFoundryCleanerV2.cleanOrganizations(
+//                                this.cloudFoundryClient, this.nameFactory)) // After Spaces
+//                .thenMany(
+//                		CloudFoundryCleanerV2.cleanOrganizationQuotaDefinitions(
+//                                this.cloudFoundryClient, this.nameFactory)) // After Organizations
+//                .retryWhen(Retry.max(5).filter(SSLException.class::isInstance))
+//                .doOnSubscribe(s -> LOGGER.debug(">> CLEANUP <<"))
+//                .doOnComplete(() -> LOGGER.debug("<< CLEANUP >>"))
+//                .then()
+//                .block(Duration.ofMinutes(30));
+//    }
+
+    public static Flux<Void> cleanApplicationsV3(
+            CloudFoundryClient cloudFoundryClient, NameFactory nameFactory) {
+        return PaginationUtils.requestClientV3Resources(
+                        page ->
+                                cloudFoundryClient
+                                        .applicationsV3()
+                                        .list(ListApplicationsRequest.builder().page(page).build()))
+                .filter(application -> nameFactory.isApplicationName(application.getName()))
+                .delayUntil(
+                        application ->
+                                removeApplicationServiceBindings(cloudFoundryClient, application))
+                .flatMap(
+                        application ->
+                                cloudFoundryClient
+                                        .applicationsV3()
+                                        .delete(
+                                                DeleteApplicationRequest.builder()
+                                                        .applicationId(application.getId())
+                                                        .build())
+                                        .then()
+                                        .doOnError(
+                                                t ->
+                                                        LOGGER.error(
+                                                                "Unable to delete V3 application"
+                                                                        + " {}",
+                                                                application.getName(),
+                                                                t)));
+    }
 
 //    private static Flux<Void> cleanBuildpacks(
 //            CloudFoundryClient cloudFoundryClient, NameFactory nameFactory) {
@@ -767,84 +761,86 @@ final class CloudFoundryCleaner {
 //                                                                t)));
 //    }
 
-//    private static Flux<Void> cleanServiceInstances(
-//            CloudFoundryClient cloudFoundryClient, NameFactory nameFactory, Version serverVersion) {
-//        return PaginationUtils.requestClientV2Resources(
-//                        page ->
-//                                cloudFoundryClient
-//                                        .serviceInstances()
-//                                        .list(
-//                                                ListServiceInstancesRequest.builder()
-//                                                        .page(page)
-//                                                        .build()))
-//                .filter(
-//                        serviceInstance ->
-//                                nameFactory.isServiceInstanceName(
-//                                        ResourceUtils.getEntity(serviceInstance).getName()))
+    public Flux<Void> cleanServiceInstances(
+            CloudFoundryClient cloudFoundryClient, NameFactory nameFactory, Version serverVersion) {
+        return PaginationUtils.requestClientV3Resources(
+                        page ->
+                                cloudFoundryClient
+                                        .serviceInstancesV3()
+                                        .list(
+                                                ListServiceInstancesRequest.builder()
+                                                        .page(page)
+                                                        .build()))
+                .filter(
+                        serviceInstance ->
+                                nameFactory.isServiceInstanceName(
+                                        ResourceUtilsV3.getId(serviceInstance)))
 //                .delayUntil(
 //                        serviceInstance ->
 //                                removeRouteAssociations(cloudFoundryClient, serviceInstance))
-//                .delayUntil(
-//                        serviceInstance ->
-//                                removeServiceInstanceServiceBindings(
-//                                        cloudFoundryClient, serviceInstance))
+                .delayUntil(
+                        serviceInstance ->
+                                removeServiceInstanceServiceBindings(
+                                        cloudFoundryClient, serviceInstance))
 //                .delayUntil(
 //                        serviceInstance -> removeServiceKeys(cloudFoundryClient, serviceInstance))
 //                .delayUntil(
 //                        serviceInstance ->
 //                                removeServiceShares(
 //                                        cloudFoundryClient, serviceInstance, serverVersion))
-//                .flatMap(
-//                        serviceInstance ->
-//                                cloudFoundryClient
-//                                        .serviceInstances()
-//                                        .delete(
-//                                                DeleteServiceInstanceRequest.builder()
-//                                                        .async(true)
-//                                                        .serviceInstanceId(
-//                                                                ResourceUtils.getId(
-//                                                                        serviceInstance))
-//                                                        .build())
-//                                        .flatMap(
-//                                                response -> {
-//                                                    Object entity = response.getEntity();
+                .flatMap(
+                        serviceInstance ->
+                                cloudFoundryClient
+                                        .serviceInstancesV3()
+                                        .delete(
+                                                DeleteServiceInstanceRequest.builder()
+                                            //            .async(true)
+                                                        .serviceInstanceId(
+                                                                ResourceUtilsV3.getId(
+                                                                        serviceInstance))
+                                                        .build())
+                                        .flatMap(
+                                                jobId -> {
+//                                                    Object entity = jobId.getEntity();
 //                                                    if (entity instanceof JobEntity) {
-//                                                        return JobUtils.waitForCompletion(
+//                                                        return JobUtilsV3.waitForCompletion(
 //                                                                cloudFoundryClient,
 //                                                                Duration.ofMinutes(5),
-//                                                                (JobEntity) response.getEntity());
+//                                                                (JobEntity) jobId.getEntity());
 //                                                    } else {
-//                                                        return LastOperationUtils.waitForCompletion(
-//                                                                Duration.ofMinutes(5),
-//                                                                () ->
-//                                                                        cloudFoundryClient
-//                                                                                .serviceInstances()
-//                                                                                .get(
-//                                                                                        GetServiceInstanceRequest
-//                                                                                                .builder()
-//                                                                                                .serviceInstanceId(
-//                                                                                                        ResourceUtils
-//                                                                                                                .getId(
-//                                                                                                                        serviceInstance))
-//                                                                                                .build())
-//                                                                                .map(
-//                                                                                        r ->
-//                                                                                                ResourceUtils
-//                                                                                                        .getEntity(
-//                                                                                                                r)
-//                                                                                                        .getLastOperation()));
-//                                                    }
-//                                                })
-//                                        .doOnError(
-//                                                t ->
-//                                                        LOGGER.error(
-//                                                                "Unable to delete service instance"
-//                                                                        + " {}",
-//                                                                ResourceUtils.getEntity(
+                                                        return LastOperationUtilsV3.waitForCompletion(
+                                                                Duration.ofMinutes(5),
+                                                                () ->
+                                                                        cloudFoundryClient
+                                                                                .serviceInstancesV3()
+                                                                                .get(
+                                                                                        GetServiceInstanceRequest
+                                                                                                .builder()
+                                                                                                .serviceInstanceId(
+                                                                                                        ResourceUtilsV3
+                                                                                                                .getId(
+                                                                                                                        serviceInstance))
+                                                                                                .build())
+                                                                                .map(
+                                                                                        r ->
+                                                                                        r.getLastOperation()
+                                                                     //                   ResourceUtilsV3
+//                                                                                                        .getEntity(r)
+//                                                                                                        .getLastOperation()
+                                                                                        ));
+    //                                                }
+                                                })
+                                        .doOnError(
+                                                t ->
+                                                        LOGGER.error(
+                                                                "Unable to delete service instance"
+                                                                        + " {}",
+                                                                        serviceInstance.getName(),
+//                                                                ResourceUtilsV3.getEntity(
 //                                                                                serviceInstance)
 //                                                                        .getName(),
-//                                                                t)));
-//    }
+                                                                t)));
+    }
 
 //    private static Flux<Void> cleanSharedDomains(
 //            CloudFoundryClient cloudFoundryClient, NameFactory nameFactory) {
@@ -1153,43 +1149,43 @@ final class CloudFoundryCleaner {
 //                || nameFactory.isUserName(ResourceUtils.getEntity(resource).getUsername());
 //    }
 
-//    private static Flux<Void> removeApplicationServiceBindings(
-//            CloudFoundryClient cloudFoundryClient, Application application) {
-//        return PaginationUtils.requestClientV2Resources(
-//                        page ->
-//                                cloudFoundryClient
-//                                        .applicationsV2()
-//                                        .listServiceBindings(
-//                                                ListApplicationServiceBindingsRequest.builder()
-//                                                        .page(page)
-//                                                        .applicationId(application.getId())
-//                                                        .build()))
-//                .flatMap(
-//                        serviceBinding ->
-//                                requestRemoveServiceBinding(
-//                                                cloudFoundryClient,
-//                                                application.getId(),
-//                                                ResourceUtils.getId(serviceBinding))
-//                                        .doOnError(
-//                                                t ->
-//                                                        LOGGER.error(
-//                                                                "Unable to remove service binding"
-//                                                                        + " from {}",
-//                                                                application.getName(),
-//                                                                t)));
-//    }
+    private static Flux<String> removeApplicationServiceBindings(
+            CloudFoundryClient cloudFoundryClient, Application application) {
+        return PaginationUtils.requestClientV3Resources(
+                        page ->
+                                cloudFoundryClient.serviceBindingsV3().list(
+ //                                       .applicationsV3().
+ //                                       .listServiceBindings(
+                                        		ListServiceBindingsRequest.builder()
+                                                        .page(page)
+                                                        .applicationId(application.getId())
+                                                        .build()))
+                .flatMap(
+                        serviceBinding ->
+                                requestRemoveServiceBinding(
+                                                cloudFoundryClient,
+                                                application.getId(),
+                                                ResourceUtilsV3.getId(serviceBinding))
+                                        .doOnError(
+                                                t ->
+                                                        LOGGER.error(
+                                                                "Unable to remove service binding"
+                                                                        + " from {}",
+                                                                application.getName(),
+                                                                t)));
+    }
 
 //    private static Flux<Void> removeRouteAssociations(
 //            CloudFoundryClient cloudFoundryClient, ServiceInstanceResource serviceInstance) {
-//        return PaginationUtils.requestClientV2Resources(
+//        return PaginationUtils.requestClientV3Resources(
 //                        page ->
 //                                cloudFoundryClient
-//                                        .serviceInstances()
+//                                        .serviceInstancesV3()
 //                                        .listRoutes(
 //                                                ListServiceInstanceRoutesRequest.builder()
 //                                                        .page(page)
 //                                                        .serviceInstanceId(
-//                                                                ResourceUtils.getId(
+//                                                                ResourceUtilsV3.getId(
 //                                                                        serviceInstance))
 //                                                        .build()))
 //                .flatMap(
@@ -1252,48 +1248,47 @@ final class CloudFoundryCleaner {
 //                                                                t)));
 //    }
 
-//    private static Flux<Void> removeServiceInstanceServiceBindings(
-//            CloudFoundryClient cloudFoundryClient, ServiceInstanceResource serviceInstance) {
-//        return PaginationUtils.requestClientV2Resources(
-//                        page ->
-//                                cloudFoundryClient
-//                                        .serviceInstances()
-//                                        .listServiceBindings(
-//                                                ListServiceInstanceServiceBindingsRequest.builder()
-//                                                        .page(page)
-//                                                        .serviceInstanceId(
-//                                                                ResourceUtils.getId(
-//                                                                        serviceInstance))
-//                                                        .build()))
-//                .flatMap(
-//                        serviceBinding ->
-//                                requestRemoveServiceBinding(
-//                                                cloudFoundryClient,
-//                                                ResourceUtils.getEntity(serviceBinding)
-//                                                        .getApplicationId(),
-//                                                ResourceUtils.getId(serviceBinding))
-//                                        .doOnError(
-//                                                t ->
-//                                                        LOGGER.error(
-//                                                                "Unable to remove service binding"
-//                                                                        + " from {}",
-//                                                                ResourceUtils.getEntity(
-//                                                                                serviceInstance)
-//                                                                        .getName(),
-//                                                                t)));
-//    }
+    private static Flux<String> removeServiceInstanceServiceBindings(
+            CloudFoundryClient cloudFoundryClient, ServiceInstanceResource serviceInstance) {
+        return PaginationUtils.requestClientV3Resources(
+                        page ->
+                                cloudFoundryClient.serviceBindingsV3().list(
+                                        		ListServiceBindingsRequest.builder()
+                                                        .page(page)
+                                                        .serviceInstanceId(
+                                                                ResourceUtilsV3.getId(
+                                                                        serviceInstance))
+                                                        .build()))
+                .flatMap(
+                        serviceBinding ->
+                                requestRemoveServiceBinding(
+                                                cloudFoundryClient,
+                                                serviceBinding.getRelationships().getApplication().getData().getId(),
+//                                                ResourceUtilsV3.getEntity(serviceBinding).getApplicationId(),
+                                                serviceBinding.getRelationships().getServiceInstance().getData().getId()
+                                                //ResourceUtilsV3.getId(serviceBinding)
+                                                )
+                                        .doOnError(
+                                                t ->
+                                                        LOGGER.error(
+                                                                "Unable to remove service binding"
+                                                                        + " from {}",
+                                                                        serviceBinding.getRelationships().getApplication().getData(),
+                                                                        serviceInstance.getName(),
+                                                                t)));
+    }
 
 //    private static Flux<Void> removeServiceKeys(
 //            CloudFoundryClient cloudFoundryClient, ServiceInstanceResource serviceInstance) {
-//        return PaginationUtils.requestClientV2Resources(
+//        return PaginationUtils.requestClientV3Resources(
 //                        page ->
 //                                cloudFoundryClient
-//                                        .serviceInstances()
+//                                        .serviceInstancesV3()
 //                                        .listServiceKeys(
 //                                                ListServiceInstanceServiceKeysRequest.builder()
 //                                                        .page(page)
 //                                                        .serviceInstanceId(
-//                                                                ResourceUtils.getId(
+//                                                                ResourceUtilsV3.getId(
 //                                                                        serviceInstance))
 //                                                        .build()))
 //                .flatMap(
@@ -1419,16 +1414,17 @@ final class CloudFoundryCleaner {
 //                                                                t)));
 //    }
 
-//    private static Mono<Void> requestRemoveServiceBinding(
-//            CloudFoundryClient cloudFoundryClient, String applicationId, String serviceBindingId) {
-//        return cloudFoundryClient
-//                .applicationsV2()
-//                .removeServiceBinding(
-//                        RemoveApplicationServiceBindingRequest.builder()
-//                                .applicationId(applicationId)
-//                                .serviceBindingId(serviceBindingId)
-//                                .build());
-//    }
+    private static Mono<String> requestRemoveServiceBinding(
+            CloudFoundryClient cloudFoundryClient, String applicationId, String serviceBindingId) {
+        return cloudFoundryClient
+        		.serviceBindingsV3().delete(
+  //              .applicationsV3().
+  //              .removeServiceBinding(
+        				DeleteServiceBindingRequest.builder()
+  //                              .applicationId(applicationId)
+                                .serviceBindingId(serviceBindingId)
+                                .build());
+    }
 
 //    private static Mono<Void> requestUnshareServiceInstance(
 //            CloudFoundryClient cloudFoundryClient,
@@ -1460,22 +1456,4 @@ final class CloudFoundryCleaner {
 //                                .spaceId(spaceId)
 //                                .build());
 //    }
-    public Cleaner getCleaner(
- //            CloudFoundryVersion expectedVersion,
-//            Version serverVersion,
-//            Supplier<Flux<Void>> supplier
-    		) {
-    	// das will ich:
-//    	getConnectionContext().getRootProvider().getRoot("cloud_controller_v3", getConnectionContext());
-    	
-//    	Mono<GetInfoResponseV3> tmp0 = this.cloudFoundryClient.().get(GetInfoRequestV3.builder().build());
-//    	GetInfoResponseV3 tmp3 = tmp0.block(Duration.ofSeconds(3));
-//    	tmp3.
-	       RootProvider tmp1 = connectionContext.getRootProvider();
-	       DelegatingRootProvider tmp2 = (DelegatingRootProvider)tmp1;
-	       String apiVersion = tmp2.getPreferedApiVersion(connectionContext);
-        return   ("v3".equals(apiVersion)) ?  new CloudFoundryCleanerV3()  : new CloudFoundryCleanerV2();
-    }
-
-
 }

@@ -68,7 +68,7 @@ public enum CloudFoundryVersion {
         this.version = version;
     }
 
-    Version getVersion() {
+    public Version getVersion() {
         return this.version;
     }
 }

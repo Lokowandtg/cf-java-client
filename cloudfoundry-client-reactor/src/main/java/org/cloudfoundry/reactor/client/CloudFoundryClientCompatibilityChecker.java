@@ -24,6 +24,8 @@ import java.util.LinkedList;
 import java.util.Queue;
 import org.cloudfoundry.client.CloudFoundryClient;
 import org.cloudfoundry.reactor.ConnectionContext;
+import org.cloudfoundry.reactor.DelegatingRootProvider;
+import org.cloudfoundry.reactor.RootProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
@@ -39,15 +41,22 @@ final class CloudFoundryClientCompatibilityChecker {
     }
 
     void check() {
+    	RootProvider tmp1 = connectionContext.getRootProvider();
+    	DelegatingRootProvider tmp2 = (DelegatingRootProvider)tmp1;
+    	String apiVersion = tmp2.getPreferedApiVersion(connectionContext);
+    	String clientVersion = CloudFoundryClient.SUPPORTED_API_VERSION;
+    	if("v3".equals(apiVersion)) {
+    		clientVersion = CloudFoundryClient.SUPPORTED_API_VERSION_V3;
+    	}
         Queue<String> keyList =
                 new LinkedList<String>(
-                        Arrays.asList("links", "cloud_controller_v2", "meta", "version"));
+                        Arrays.asList("links", "cloud_controller_"+apiVersion, "meta", "version"));
 
         connectionContext
                 .getRootProvider()
                 .getRootKey(keyList, connectionContext)
                 .map(response -> Version.valueOf(response))
-                .zipWith(Mono.just(Version.valueOf(CloudFoundryClient.SUPPORTED_API_VERSION)))
+                .zipWith(Mono.just(Version.valueOf(clientVersion)))
                 .subscribe(
                         consumer(
                                 (server, supported) ->

@@ -96,7 +96,7 @@ public abstract class AbstractClientV2Operations extends AbstractReactorOperatio
         return createOperator()
                 .flatMap(
                         operator ->
-                                operator.get()
+                                operator.get() // Hier das operator.context.root ansehen. oder den Packagenamen :-)
                                         .uri(
                                                 queryTransformer(requestPayload)
                                                         .andThen(uriTransformer))
