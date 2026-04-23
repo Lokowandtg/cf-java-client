@@ -143,6 +143,8 @@ public final class ServiceBrokerUtils {
         String hostName = nameFactory.getHostName();
 
         Map<String, Object> env = new HashMap<>();
+        env.put("JBP_CONFIG_OPEN_JDK_JRE", "{ jre: { version: 8.+ } }");
+        env.put("JAVA_RUNTIME_VERSION", "8");
         env.put("SERVICE_NAME", serviceName);
         env.put("PLAN_NAME", planName);
 
