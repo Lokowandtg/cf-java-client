@@ -183,7 +183,21 @@ public final class OrganizationsTest extends AbstractIntegrationTest {
                 .map(GetOrganizationDefaultDomainResponse::getName)
                 .as(StepVerifier::create)
                 .consumeNextWith(
-                        name -> assertThat(name).contains("apps.", ".shepherd.tanzu.broadcom.net"))
+                        name -> {
+                            assertThat(name)
+                                    .satisfiesAnyOf(
+                                            nameParam ->
+                                                    assertThat(nameParam)
+                                                            .contains(
+                                                                    "apps.",
+                                                                    ".shepherd.tanzu.broadcom.net"),
+                                            nameParam ->
+                                                    assertThat(nameParam)
+                                                            .contains(
+                                                                    "apps.",
+                                                                    ".127-0-0-1.nip.io")); // when
+                            // testing with kind-deploy.
+                        })
                 .expectComplete()
                 .verify(Duration.ofMinutes(5));
     }
