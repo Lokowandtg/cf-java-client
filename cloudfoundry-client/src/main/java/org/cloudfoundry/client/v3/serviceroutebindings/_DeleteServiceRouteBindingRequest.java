@@ -18,6 +18,8 @@ package org.cloudfoundry.client.v3.serviceroutebindings;
 
 import org.immutables.value.Value;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 /**
  * The request payload for the Delete Service Route Binding operation.
  * see https://v3-apidocs.cloudfoundry.org/index.html#delete-a-service-route-binding
@@ -25,5 +27,6 @@ import org.immutables.value.Value;
 @Value.Immutable
 abstract class _DeleteServiceRouteBindingRequest {
 
+    @JsonIgnore
     abstract String getServiceRouteBindingId();
 }

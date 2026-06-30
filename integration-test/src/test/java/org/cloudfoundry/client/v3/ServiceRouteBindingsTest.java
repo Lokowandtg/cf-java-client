@@ -23,6 +23,7 @@ import java.util.Collections;
 import org.cloudfoundry.AbstractIntegrationTest;
 import org.cloudfoundry.CloudFoundryVersion;
 import org.cloudfoundry.IfCloudFoundryVersion;
+import org.cloudfoundry.Nullable;
 import org.cloudfoundry.client.CloudFoundryClient;
 import org.cloudfoundry.client.v3.domains.CreateDomainRequest;
 import org.cloudfoundry.client.v3.domains.CreateDomainResponse;
@@ -152,21 +153,26 @@ public class ServiceRouteBindingsTest extends AbstractIntegrationTest {
                         function(
                                 (routeId, serviceInstanceId) ->
                                         createServiceRouteBinding(
-                                                this.cloudFoundryClient,
-                                                routeId,
-                                                serviceInstanceId)))
-                .map(ServiceRouteBinding::getId)
-                .flatMap(
-                        bindingId ->
-                                this.cloudFoundryClient
-                                        .serviceRouteBindingsV3()
-                                        .delete(
-                                                DeleteServiceRouteBindingRequest.builder()
-                                                        .serviceRouteBindingId(bindingId)
-                                                        .build()))
-                .hasElement()
+                                                        this.cloudFoundryClient,
+                                                        routeId,
+                                                        serviceInstanceId)
+                                                .map(ServiceRouteBinding::getId)
+                                                .flatMap(
+                                                        bindingId ->
+                                                                this.cloudFoundryClient
+                                                                        .serviceRouteBindingsV3()
+                                                                        .delete(
+                                                                                DeleteServiceRouteBindingRequest
+                                                                                        .builder()
+                                                                                        .serviceRouteBindingId(
+                                                                                                bindingId)
+                                                                                        .build()))
+                                                .thenMany(
+                                                        requestListServiceRouteBindings(
+                                                                this.cloudFoundryClient, null))
+                                                .hasElements()))
                 .as(StepVerifier::create)
-                .expectNext(true)
+                .expectNext(false)
                 .expectComplete()
                 .verify(Duration.ofMinutes(5));
     }
@@ -471,16 +477,16 @@ public class ServiceRouteBindingsTest extends AbstractIntegrationTest {
     }
 
     private static Flux<ServiceRouteBindingResource> requestListServiceRouteBindings(
-            CloudFoundryClient cloudFoundryClient, String routeId) {
+            CloudFoundryClient cloudFoundryClient, @Nullable String routeId) {
         return PaginationUtils.requestClientV3Resources(
-                page ->
-                        cloudFoundryClient
-                                .serviceRouteBindingsV3()
-                                .list(
-                                        ListServiceRouteBindingsRequest.builder()
-                                                .page(page)
-                                                .routeId(routeId)
-                                                .build()));
+                page -> {
+                    ListServiceRouteBindingsRequest.Builder builder =
+                            ListServiceRouteBindingsRequest.builder().page(page);
+                    if (routeId != null) {
+                        builder.routeId(routeId);
+                    }
+                    return cloudFoundryClient.serviceRouteBindingsV3().list(builder.build());
+                });
     }
 
     private static Flux<ServiceRouteBindingResource>

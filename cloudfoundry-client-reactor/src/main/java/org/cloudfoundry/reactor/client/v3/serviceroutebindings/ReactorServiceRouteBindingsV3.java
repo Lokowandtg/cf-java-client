@@ -40,7 +40,7 @@ import reactor.core.publisher.Mono;
 /**
  * The Reactor-based implementation of {@link ServiceRouteBindingsV3}
  */
-public class ReactorServiceRouteBindingsV3 extends AbstractClientV3Operations
+public final class ReactorServiceRouteBindingsV3 extends AbstractClientV3Operations
         implements ServiceRouteBindingsV3 {
 
     public ReactorServiceRouteBindingsV3(

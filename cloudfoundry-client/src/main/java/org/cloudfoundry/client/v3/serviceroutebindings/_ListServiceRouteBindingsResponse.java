@@ -27,7 +27,7 @@ import org.immutables.value.Value;
  */
 @JsonDeserialize
 @Value.Immutable
-public abstract class _ListServiceRouteBindingsResponse
+abstract class _ListServiceRouteBindingsResponse
         extends PaginatedResponse<ServiceRouteBindingResource> {
 	
 }
