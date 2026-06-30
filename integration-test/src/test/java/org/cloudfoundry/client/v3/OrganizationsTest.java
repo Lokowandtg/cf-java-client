@@ -49,6 +49,7 @@ import org.cloudfoundry.client.v3.organizations.ListOrganizationDomainsRequest;
 import org.cloudfoundry.client.v3.organizations.ListOrganizationsRequest;
 import org.cloudfoundry.client.v3.organizations.OrganizationResource;
 import org.cloudfoundry.client.v3.organizations.UpdateOrganizationRequest;
+import org.cloudfoundry.reactor.DefaultConnectionContext;
 import org.cloudfoundry.util.JobUtils;
 import org.cloudfoundry.util.PaginationUtils;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,8 @@ public final class OrganizationsTest extends AbstractIntegrationTest {
     @Autowired private CloudFoundryClient cloudFoundryClient;
 
     @Autowired private Mono<String> organizationId;
+
+    @Autowired private DefaultConnectionContext connectionContext;
 
     @Test
     public void assignDefaultIsolationSegment() {
@@ -170,7 +173,8 @@ public final class OrganizationsTest extends AbstractIntegrationTest {
     @Test
     public void getDefaultDomain() {
         String organizationName = this.nameFactory.getOrganizationName();
-
+        String apiHost = this.connectionContext.getApiHost();
+        String host = apiHost.replace("api", "");
         createOrganizationId(this.cloudFoundryClient, organizationName)
                 .flatMap(
                         organizationId ->
@@ -182,22 +186,7 @@ public final class OrganizationsTest extends AbstractIntegrationTest {
                                                         .build()))
                 .map(GetOrganizationDefaultDomainResponse::getName)
                 .as(StepVerifier::create)
-                .consumeNextWith(
-                        name -> {
-                            assertThat(name)
-                                    .satisfiesAnyOf(
-                                            nameParam ->
-                                                    assertThat(nameParam)
-                                                            .contains(
-                                                                    "apps.",
-                                                                    ".shepherd.tanzu.broadcom.net"),
-                                            nameParam ->
-                                                    assertThat(nameParam)
-                                                            .contains(
-                                                                    "apps.",
-                                                                    ".127-0-0-1.nip.io")); // when
-                            // testing with kind-deploy.
-                        })
+                .consumeNextWith(name -> assertThat(name).contains("apps.", host))
                 .expectComplete()
                 .verify(Duration.ofMinutes(5));
     }
