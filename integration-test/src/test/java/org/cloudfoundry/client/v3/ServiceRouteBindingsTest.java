@@ -169,7 +169,7 @@ public class ServiceRouteBindingsTest extends AbstractIntegrationTest {
                                                                                         .build()))
                                                 .thenMany(
                                                         requestListServiceRouteBindings(
-                                                                this.cloudFoundryClient, null))
+                                                                this.cloudFoundryClient, routeId))
                                                 .hasElements()))
                 .as(StepVerifier::create)
                 .expectNext(false)
