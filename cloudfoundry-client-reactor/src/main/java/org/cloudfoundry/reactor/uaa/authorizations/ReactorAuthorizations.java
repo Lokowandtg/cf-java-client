@@ -112,11 +112,6 @@ public final class ReactorAuthorizations extends AbstractUaaOperations implement
                 .checkpoint();
     }
 
-
-
-
-
-
     @Override
     public Mono<String> authorizationCodeGrantHybrid(
             AuthorizeByAuthorizationCodeGrantHybridRequest request) {
