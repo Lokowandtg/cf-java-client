@@ -48,6 +48,7 @@ import org.cloudfoundry.client.v2.stacks.StackEntity;
 import org.cloudfoundry.client.v2.stacks.StackResource;
 import org.cloudfoundry.client.v2.userprovidedserviceinstances.CreateUserProvidedServiceInstanceRequest;
 import org.cloudfoundry.doppler.DopplerClient;
+import org.cloudfoundry.logcache.v1.LogCacheClient;
 import org.cloudfoundry.logcache.v1.TestLogCacheEndpoints;
 import org.cloudfoundry.networking.NetworkingClient;
 import org.cloudfoundry.operations.DefaultCloudFoundryOperations;
@@ -192,18 +193,25 @@ public class IntegrationTestConfiguration {
 
     @Bean
     @Qualifier("admin")
-    ReactorUaaClient adminUaaClient(
+    UaaClient adminUaaClient(
             ConnectionContext connectionContext,
             @Value("${test.admin.clientId}") String clientId,
-            @Value("${test.admin.clientSecret}") String clientSecret) {
-        return ReactorUaaClient.builder()
-                .connectionContext(connectionContext)
-                .tokenProvider(
-                        ClientCredentialsGrantTokenProvider.builder()
-                                .clientId(clientId)
-                                .clientSecret(clientSecret)
-                                .build())
-                .build();
+            @Value("${test.admin.clientSecret}") String clientSecret,
+            @Value("${uaa.api.request.limit:#{null}}") Integer environmentRequestLimit) {
+        ReactorUaaClient unthrottledClient =
+                ReactorUaaClient.builder()
+                        .connectionContext(connectionContext)
+                        .tokenProvider(
+                                ClientCredentialsGrantTokenProvider.builder()
+                                        .clientId(clientId)
+                                        .clientSecret(clientSecret)
+                                        .build())
+                        .build();
+        if (environmentRequestLimit == null) {
+            return unthrottledClient;
+        } else {
+            return new ThrottlingUaaClient(unthrottledClient, environmentRequestLimit);
+        }
     }
 
     @Bean(initMethod = "block")
@@ -266,6 +274,7 @@ public class IntegrationTestConfiguration {
     DefaultCloudFoundryOperations cloudFoundryOperations(
             CloudFoundryClient cloudFoundryClient,
             DopplerClient dopplerClient,
+            LogCacheClient logCacheClient,
             NetworkingClient networkingClient,
             RoutingClient routingClient,
             UaaClient uaaClient,
@@ -274,6 +283,7 @@ public class IntegrationTestConfiguration {
         return DefaultCloudFoundryOperations.builder()
                 .cloudFoundryClient(cloudFoundryClient)
                 .dopplerClient(dopplerClient)
+                .logCacheClient(logCacheClient)
                 .networkingClient(networkingClient)
                 .routingClient(routingClient)
                 .uaaClient(uaaClient)
@@ -643,11 +653,20 @@ public class IntegrationTestConfiguration {
     }
 
     @Bean
-    ReactorUaaClient uaaClient(ConnectionContext connectionContext, TokenProvider tokenProvider) {
-        return ReactorUaaClient.builder()
-                .connectionContext(connectionContext)
-                .tokenProvider(tokenProvider)
-                .build();
+    UaaClient uaaClient(
+            ConnectionContext connectionContext,
+            TokenProvider tokenProvider,
+            @Value("${uaa.api.request.limit:#{null}}") Integer environmentRequestLimit) {
+        ReactorUaaClient unthrottledClient =
+                ReactorUaaClient.builder()
+                        .connectionContext(connectionContext)
+                        .tokenProvider(tokenProvider)
+                        .build();
+        if (environmentRequestLimit == null) {
+            return unthrottledClient;
+        } else {
+            return new ThrottlingUaaClient(unthrottledClient, environmentRequestLimit);
+        }
     }
 
     @Bean(initMethod = "block")
@@ -730,7 +749,7 @@ public class IntegrationTestConfiguration {
         return nameFactory.getUserName();
     }
 
-    private static final class FailingDeserializationProblemHandler
+    public static final class FailingDeserializationProblemHandler
             extends DeserializationProblemHandler {
 
         @Override

@@ -15,7 +15,65 @@ The `cf-java-client` project is a Java language binding for interacting with a C
 * `cloudfoundry-operations` – An API and implementation that corresponds to the [Cloud Foundry CLI][c] operations.  This project builds on the `cloudfoundry-client` and therefore has a single implementation.
 
 ## Versions
-The Cloud Foundry Java Client has two active versions. The `5.x` line is compatible with Spring Boot `2.4.x - 2.6.x` just to manage its dependencies, while the `4.x` line uses Spring Boot `2.3.x`.
+The Cloud Foundry Java Client has two active versions. The `6.x` line includes breaking changes (see below), while the `5.x` line maintains backward compatibility.
+
+## Breaking Changes (6.x)
+
+### `DopplerClient.recentLogs()` — Recent Logs via Doppler
+
+> [!WARNING]
+> **Removed since cf-java-client `6.0.x`**
+>
+> The `DopplerClient.recentLogs()` endpoint (and the related `RecentLogsRequest` / `LogMessage` types from the `org.cloudfoundry.doppler` package) have been **removed**.
+>
+> This API relied on the [Loggregator][loggregator] Doppler/Traffic Controller endpoint `/apps/{id}/recentlogs`, which was removed in **Loggregator ≥ 107.0**.
+> The affected platform versions are:
+>
+> | Platform | Last version with Doppler recent-logs support |
+> | -------- | --------------------------------------------- |
+> | CF Deployment (CFD) | `< 24.3` |
+> | Tanzu Application Service (TAS) | `< 4.0` |
+>
+> **Migration:** Replace any call to `DopplerClient.recentLogs()` with [`LogCacheClient.read()`][log-cache-api] (available via `org.cloudfoundry.logcache.v1.LogCacheClient`).
+>
+> ```java
+> // Before (deprecated)
+> dopplerClient.recentLogs(RecentLogsRequest.builder()
+>     .applicationId(appId)
+>     .build());
+>
+> // After
+> logCacheClient.read(ReadRequest.builder()
+>     .sourceId(appId)
+>     .envelopeTypes(EnvelopeType.LOG)
+>     .build());
+> ```
+>
+> The return type and envelope objects differ between the two APIs:
+>
+> | | Doppler (`org.cloudfoundry.doppler`) | Log Cache (`org.cloudfoundry.logcache.v1`) |
+> |---|---|---|
+> | **Return type** | `Flux<Envelope>` | `Mono<ReadResponse>` → unpack via `response.getEnvelopes().getBatch()` |
+> | **Log access** | `envelope.getLogMessage()` → `LogMessage` | `envelope.getLog()` → `Log` |
+> | **Message text** | `logMessage.getMessage()` | `log.getPayloadAsText()` |
+> | **Message type** | `MessageType.OUT` / `ERR` | `LogType.OUT` / `ERR` |
+> | **Source metadata** | `logMessage.getSourceType()`, `.getSourceInstance()` | `envelope.getTags().get("source_type")`, `envelope.getInstanceId()` |
+>
+> See the [`org.cloudfoundry.doppler`][doppler-pkg] and [`org.cloudfoundry.logcache.v1`][logcache-pkg] Javadoc for full type details.
+
+> [!NOTE]
+> **Operations API users:** Use `Applications.logs(ApplicationLogsRequest)` instead of the removed `Applications.logs(LogsRequest)`.
+
+### `Applications.logs(LogsRequest)` — Removed
+
+> [!WARNING]
+> **Removed since cf-java-client `6.0.x`**
+> The `Applications.logs(LogsRequest)` method (and the `LogsRequest` type) have been **removed**.
+>
+> **Migration:** Use `Applications.logs(ApplicationLogsRequest)` instead. For recent logs, set `recent(true)` (the default). For streaming, set `recent(false)`.
+
+[loggregator]: https://github.com/cloudfoundry/loggregator
+[log-cache-api]: https://github.com/cloudfoundry/log-cache
 
 ## Dependencies
 Most projects will need two dependencies; the Operations API and an implementation of the Client API.  For Maven, the dependencies would be defined like this:
@@ -75,6 +133,9 @@ repositories {
 Both the `cloudfoundry-operations` and `cloudfoundry-client` projects follow a ["Reactive"][r] design pattern and expose their responses with [Project Reactor][p] `Monos`s and `Flux`s.
 
 ### `CloudFoundryClient`, `DopplerClient`, `UaaClient` Builders
+
+> [!NOTE]
+> **`DopplerClient` — partial deprecation:** The `recentLogs()` method on `DopplerClient` is deprecated and only works against Loggregator \< 107.0 (CFD \< 24.3 / TAS \< 4.0). See the [Deprecations](#deprecations) section above for the migration path to `LogCacheClient`.
 
 The lowest-level building blocks of the API are `ConnectionContext` and `TokenProvider`.  These types are intended to be shared between instances of the clients, and come with out of the box implementations.  To instantiate them, you configure them with builders:
 
@@ -297,6 +358,7 @@ Name | Description
 `TEST_PROXY_PORT` | _(Optional)_ The port of a proxy to route all requests through. Defaults to `8080`.
 `TEST_PROXY_USERNAME` | _(Optional)_ The username for a proxy to route all requests through
 `TEST_SKIPSSLVALIDATION` | _(Optional)_ Whether to skip SSL validation when connecting to the Cloud Foundry instance.  Defaults to `false`.
+`UAA_API_REQUEST_LIMIT` | _(Optional)_ If your UAA server does rate limiting and returns 429 errors, set this variable to the smallest limit configured there. Whether your server limits UAA calls is shown in the log, together with the location of the configuration file on the server. Defaults to `0` (no limit).
 
 If you do not have access to a CloudFoundry instance with admin access, you can run one locally using [bosh-deployment](https://github.com/cloudfoundry/bosh-deployment) & [cf-deployment](https://github.com/cloudfoundry/cf-deployment/) and Virtualbox.
 

@@ -57,10 +57,11 @@ import org.cloudfoundry.client.v3.domains.DomainsV3;
 import org.cloudfoundry.client.v3.droplets.Droplets;
 import org.cloudfoundry.client.v3.isolationsegments.IsolationSegments;
 import org.cloudfoundry.client.v3.jobs.JobsV3;
-import org.cloudfoundry.client.v3.organizationquotadefinitions.OrganizationQuotaDefinitionsV3;
 import org.cloudfoundry.client.v3.organizations.OrganizationsV3;
 import org.cloudfoundry.client.v3.packages.Packages;
 import org.cloudfoundry.client.v3.processes.Processes;
+import org.cloudfoundry.client.v3.quotas.organizations.OrganizationQuotasV3;
+import org.cloudfoundry.client.v3.quotas.spaces.SpaceQuotasV3;
 import org.cloudfoundry.client.v3.resourcematch.ResourceMatchV3;
 import org.cloudfoundry.client.v3.roles.RolesV3;
 import org.cloudfoundry.client.v3.routes.RoutesV3;
@@ -73,6 +74,7 @@ import org.cloudfoundry.client.v3.serviceplans.ServicePlansV3;
 import org.cloudfoundry.client.v3.spaces.SpacesV3;
 import org.cloudfoundry.client.v3.stacks.StacksV3;
 import org.cloudfoundry.client.v3.tasks.Tasks;
+import org.cloudfoundry.client.v3.users.UsersV3;
 
 /**
  * Main entry point to the Cloud Foundry Client API
@@ -82,7 +84,7 @@ public interface CloudFoundryClient {
     /**
      * The currently supported Cloud Controller API version
      */
-    String SUPPORTED_API_VERSION = "2.269.0";
+    String SUPPORTED_API_VERSION = "2.272.0";
 
     /**
      * Main entry point to the Cloud Foundry Application Usage Events Client API
@@ -190,9 +192,9 @@ public interface CloudFoundryClient {
     OrganizationQuotaDefinitions organizationQuotaDefinitions();
 
     /**
-     * Main entry point to the Cloud Foundry Quota Definitions V3 Client API
+     * Main entry point to the Cloud Foundry Quota V3 Client API
      */
-    OrganizationQuotaDefinitionsV3 organizationQuotaDefinitionsV3();
+    OrganizationQuotasV3 organizationQuotasV3();
 
     /**
      * Main entry point to the Cloud Foundry Organizations V2 Client API
@@ -335,6 +337,11 @@ public interface CloudFoundryClient {
     SpaceQuotaDefinitions spaceQuotaDefinitions();
 
     /**
+     * Main entry point to the Cloud Foundry Space V3 Client API
+     */
+    SpaceQuotasV3 spaceQuotasV3();
+
+    /**
      * Main entry point to the Cloud Foundry Spaces V2 Client API
      */
     Spaces spaces();
@@ -369,4 +376,9 @@ public interface CloudFoundryClient {
      * Main entry point to the Cloud Foundry Users Client API
      */
     Users users();
+
+    /**
+     * Main entry point to the Cloud Foundry Users V3 Client API
+     */
+    UsersV3 usersV3();
 }

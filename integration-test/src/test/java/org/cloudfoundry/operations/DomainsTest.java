@@ -17,15 +17,20 @@
 package org.cloudfoundry.operations;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.cloudfoundry.operations.domains.Status.OWNED;
 import static org.cloudfoundry.operations.domains.Status.SHARED;
 
 import java.time.Duration;
 import org.cloudfoundry.AbstractIntegrationTest;
-import org.cloudfoundry.client.v2.ClientV2Exception;
+import org.cloudfoundry.client.CloudFoundryClient;
+import org.cloudfoundry.client.v3.ClientV3Exception;
+import org.cloudfoundry.client.v3.Error;
+import org.cloudfoundry.client.v3.domains.GetDomainRequest;
 import org.cloudfoundry.operations.domains.CreateDomainRequest;
 import org.cloudfoundry.operations.domains.CreateSharedDomainRequest;
 import org.cloudfoundry.operations.domains.Domain;
+import org.cloudfoundry.operations.domains.RouterGroup;
 import org.cloudfoundry.operations.domains.ShareDomainRequest;
 import org.cloudfoundry.operations.domains.UnshareDomainRequest;
 import org.cloudfoundry.operations.organizations.CreateOrganizationRequest;
@@ -40,6 +45,7 @@ public final class DomainsTest extends AbstractIntegrationTest {
     private static final String DEFAULT_ROUTER_GROUP = "default-tcp";
 
     @Autowired private CloudFoundryOperations cloudFoundryOperations;
+    @Autowired private CloudFoundryClient cloudFoundryClient;
 
     @Autowired private String organizationName;
 
@@ -56,10 +62,20 @@ public final class DomainsTest extends AbstractIntegrationTest {
                 .consumeErrorWith(
                         t ->
                                 assertThat(t)
-                                        .isInstanceOf(ClientV2Exception.class)
-                                        .hasMessageMatching(
-                                                "CF-DomainInvalid\\([0-9]+\\): The domain is"
-                                                        + " invalid.*"))
+                                        .asInstanceOf(type(ClientV3Exception.class))
+                                        .extracting(ClientV3Exception::getErrors)
+                                        .asList()
+                                        .hasSize(1)
+                                        .first()
+                                        .isEqualTo(
+                                                Error.builder()
+                                                        .title("CF-UnprocessableEntity")
+                                                        .code(10008)
+                                                        .detail(
+                                                                "Name does not comply with RFC 1035"
+                                                                    + " standards, Name must"
+                                                                    + " contain at least one \".\"")
+                                                        .build()))
                 .verify(Duration.ofMinutes(5));
     }
 
@@ -112,9 +128,35 @@ public final class DomainsTest extends AbstractIntegrationTest {
                                 .build())
                 .thenMany(requestListDomains(this.cloudFoundryOperations))
                 .filter(domain -> domainName.equals(domain.getName()))
-                .map(Domain::getType)
                 .as(StepVerifier::create)
-                .expectNext("tcp")
+                .expectNextMatches(domain -> domain.getType().equals("tcp"))
+                .expectComplete()
+                .verify(Duration.ofMinutes(5));
+
+        this.cloudFoundryOperations
+                .domains()
+                .list()
+                .filter(d -> d.getName().equals(domainName))
+                .single()
+                .flatMap(
+                        d ->
+                                this.cloudFoundryClient
+                                        .domainsV3()
+                                        .get(
+                                                GetDomainRequest.builder()
+                                                        .domainId(d.getId())
+                                                        .build()))
+                .map(d -> d.getRouterGroup().getId())
+                .flatMap(
+                        id ->
+                                this.cloudFoundryOperations
+                                        .domains()
+                                        .listRouterGroups()
+                                        .filter(rg -> rg.getId().equals(id))
+                                        .single())
+                .map(RouterGroup::getName)
+                .as(StepVerifier::create)
+                .expectNext(DEFAULT_ROUTER_GROUP)
                 .expectComplete()
                 .verify(Duration.ofMinutes(5));
     }
